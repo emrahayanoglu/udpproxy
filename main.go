@@ -11,6 +11,7 @@ import (
 
 var opts struct {
 	Source string   `long:"source" default:":2203" description:"Source port to listen on"`
+	Filter string   `long:"filter" default:"" description:"Filter only packets if it is not received from IP:Port address specified"`
 	Target []string `long:"target" description:"Target address to forward to"`
 	Quiet  bool     `long:"quiet" description:"whether to print logging info or not"`
 	Buffer int      `long:"buffer" default:"10240" description:"max buffer size for the socket io"`
@@ -79,7 +80,12 @@ func main() {
 			continue
 		}
 
-		log.WithField("addr", addr.String()).WithField("bytes", n).WithField("content", string(b)).Info("Packet received")
+		log.WithField("addr", addr.String()).WithField("bytes", n).Info("Packet received")
+		if addr.String() != opts.Filter {
+			log.Info("Packet is filtered out since it is not received from %s", addr.String())
+			continue
+		}
+
 		for _, v := range targetConn {
 			if _, err := v.Write(b[0:n]); err != nil {
 				log.WithError(err).Warn("Could not forward packet.")
