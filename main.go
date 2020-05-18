@@ -81,7 +81,7 @@ func main() {
 		}
 
 		log.WithField("addr", addr.String()).WithField("bytes", n).Info("Packet received")
-		if addr.String() != opts.Filter {
+		if opts.Filter != "" && addr.String() != opts.Filter {
 			log.Info("Packet is filtered out since it is not received from %s", addr.String())
 			continue
 		}
