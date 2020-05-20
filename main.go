@@ -10,11 +10,12 @@ import (
 )
 
 var opts struct {
-	Source string   `long:"source" default:":2203" description:"Source port to listen on"`
-	Filter string   `long:"filter" default:"" description:"Filter only packets if it is not received from IP:Port address specified"`
-	Target []string `long:"target" description:"Target address to forward to"`
-	Quiet  bool     `long:"quiet" description:"whether to print logging info or not"`
-	Buffer int      `long:"buffer" default:"10240" description:"max buffer size for the socket io"`
+	Source    string   `long:"source" default:":2203" description:"Source port to listen on"`
+	Filter    string   `long:"filter" default:"" description:"Filter only packets if it is not received from IP:Port address specified"`
+	SetSource string   `long:"setsource" default:"" description:"Set Source when sending packet to targets"`
+	Target    []string `long:"target" description:"Target address to forward to"`
+	Quiet     bool     `long:"quiet" description:"whether to print logging info or not"`
+	Buffer    int      `long:"buffer" default:"10240" description:"max buffer size for the socket io"`
 }
 
 func main() {
@@ -55,19 +56,18 @@ func main() {
 		return
 	}
 
-	defer sourceConn.Close()
+	var setSource *net.UDPAddr
 
-	var targetConn []*net.UDPConn
-	for _, v := range targetAddr {
-		conn, err := net.DialUDP("udp", nil, v)
+	if opts.SetSource != "" {
+		setSource, err = net.ResolveUDPAddr("udp", opts.SetSource)
+
 		if err != nil {
-			log.WithError(err).Fatal("Could not connect to target address:", v)
+			log.WithError(err).Fatal("Could not create source address:", opts.SetSource)
 			return
 		}
-
-		defer conn.Close()
-		targetConn = append(targetConn, conn)
 	}
+
+	defer sourceConn.Close()
 
 	log.Printf(">> Starting udpproxy, Source at %v, Target at %v...", opts.Source, opts.Target)
 
@@ -86,10 +86,18 @@ func main() {
 			continue
 		}
 
-		for _, v := range targetConn {
-			if _, err := v.Write(b[0:n]); err != nil {
+		for _, v := range targetAddr {
+			conn, err := net.DialUDP("udp", setSource, v)
+			if err != nil {
+				log.WithError(err).Fatal("Could not connect to target address:", v)
+				return
+			}
+
+			if _, err := conn.Write(b[0:n]); err != nil {
 				log.WithError(err).Warn("Could not forward packet.")
 			}
+
+			conn.Close()
 		}
 	}
 }
